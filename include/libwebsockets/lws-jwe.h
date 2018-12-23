@@ -29,6 +29,14 @@
  *     BASE64URL(JWE Authentication Tag)
  */
 
+struct lws_jwe {
+	struct lws_jose jose;
+	struct lws_jws jws;
+	struct lws_jwk jwk;
+
+	int recip;
+};
+
 #define LWS_JWE_RFC3394_OVERHEAD_BYTES 8
 #define LWS_JWE_AES_IV_BYTES 16
 
@@ -40,12 +48,16 @@
 /* the largest key element for any cipher */
 #define LWS_JWE_LIMIT_KEY_ELEMENT_BYTES (LWS_JWE_LIMIT_RSA_KEY_BITS / 8)
 
+LWS_VISIBLE LWS_EXTERN void
+lws_jwe_init(struct lws_jwe *jwe, struct lws_context *context);
+
+LWS_VISIBLE LWS_EXTERN void
+lws_jwe_destroy(struct lws_jwe *jwe);
+
 /**
  * lws_jwe_create_packet() - add b64 sig to b64 hdr + payload
  *
- * \param jwk: the struct lws_jwk containing the signing key
- * \param algtype: the signing algorithm
- * \param hash_type: the hashing algorithm
+ * \param jwe: the struct lws_jwe we are trying to render
  * \param payload: unencoded payload JSON
  * \param len: length of unencoded payload JSON
  * \param nonce: Nonse string to include in protected header
@@ -62,7 +74,7 @@
  * Returns the length written to \p out, or -1.
  */
 LWS_VISIBLE LWS_EXTERN int
-lws_jwe_create_packet(struct lws_jose *jose, struct lws_jwk *jwk,
+lws_jwe_create_packet(struct lws_jwe *jwe,
 		      const char *payload, size_t len, const char *nonce,
 		      char *out, size_t out_len, struct lws_context *context);
 
@@ -80,8 +92,10 @@ lws_jwe_be64(uint64_t c, uint8_t *p8);
  */
 
 LWS_VISIBLE LWS_EXTERN int
-lws_jwe_write_compact(struct lws_jose *jose, struct lws_jws *jws,
-		      char *out, size_t out_len);
+lws_jwe_render_compact(struct lws_jwe *jwe, char *out, size_t out_len);
+
+LWS_VISIBLE int
+lws_jwe_render_flattened(struct lws_jwe *jwe, char *out, size_t out_len);
 
 
 /**
@@ -108,19 +122,18 @@ lws_jwe_write_compact(struct lws_jose *jose, struct lws_jws *jws,
  * Returns decrypt length, or -1 for failure.
  */
 LWS_VISIBLE LWS_EXTERN int
-lws_jwe_auth_and_decrypt(struct lws_jose *jose, struct lws_jws *jws);
+lws_jwe_auth_and_decrypt(struct lws_jwe *jwe, char *temp, int *temp_len);
 
 
 
 /* only exposed because we have test vectors that need it */
 LWS_VISIBLE LWS_EXTERN int
-lws_jwe_auth_and_decrypt_cbc_hs(struct lws_jose *jose,
-					struct lws_jws *jws, uint8_t *enc_cek,
+lws_jwe_auth_and_decrypt_cbc_hs(struct lws_jwe *jwe, uint8_t *enc_cek,
 					uint8_t *aad, int aad_len);
 
 /* only exposed because we have test vectors that need it */
 LWS_VISIBLE LWS_EXTERN int
-lws_jwa_concat_kdf(struct lws_jose *jose, struct lws_jws *jws, int direct,
+lws_jwa_concat_kdf(struct lws_jwe *jwe, int direct,
 		   uint8_t *out, const uint8_t *shared_secret, int sslen);
 
 
@@ -135,5 +148,4 @@ lws_jwa_concat_kdf(struct lws_jose *jose, struct lws_jws *jws, int direct,
  * returns the amount of temp used, or -1 for error
  */
 LWS_VISIBLE LWS_EXTERN int
-lws_jwe_encrypt(struct lws_jose *jose, struct lws_jws *jws,
-		char *temp, int *temp_len);
+lws_jwe_encrypt(struct lws_jwe *jwe, char *temp, int *temp_len);
